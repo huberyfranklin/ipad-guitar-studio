@@ -1,0 +1,18 @@
+{
+  "name": "iPad Guitar Studio",
+  "short_name": "GuitarStudio",
+  "description": "iPad 互動式吉他指板與節奏訓練教學 App",
+  "start_url": "/courses",
+  "display": "standalone",
+  "orientation": "landscape",
+  "background_color": "#020617",
+  "theme_color": "#0f172a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
