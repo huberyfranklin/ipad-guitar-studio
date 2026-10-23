@@ -2,14 +2,19 @@ name: Keep Supabase Alive
 
 on:
   schedule:
-    # 每天 UTC 04:00 (台灣時間中午 12:00) 定時觸發一次，確保專案活躍不被暫停
+    # 每 3 天 UTC 04:00 (台灣時間中午 12:00) 定時觸發一次
     - cron: '0 4 */3 * *'
   workflow_dispatch: # 支援在 GitHub 網頁上手動點擊 "Run workflow" 測試
 
 jobs:
-  ping-supabase:
+  ping-and-keepalive:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # 允許寫入權限，用於自動 commit/push 防止 GitHub 60 天無 commit 停用 cron
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
       - name: Ping Supabase Database via REST API
         env:
           SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}
@@ -29,4 +34,33 @@ jobs:
           else
             echo "Failed to ping Supabase with status $HTTP_STATUS"
             exit 1
+          fi
+
+      # 防止 GitHub 60 天無 commit 自動停用 scheduled workflow
+      # 每月 1 號自動更新一個微小 timestamp 檔案並 commit，使 repository 永遠有活動
+      - name: Prevent GitHub 60-day cron deactivation
+        run: |
+          DAY_OF_MONTH=$(date -u +%-d)
+          echo "Current day of month (UTC): $DAY_OF_MONTH"
+          
+          # 僅在每月 1 號到 3 號之間的第一個排程觸發時進行一次微小 commit
+          if [ "$DAY_OF_MONTH" -le 3 ]; then
+            echo "Updating keepalive timestamp to prevent GitHub cron deactivation..."
+            mkdir -p .github
+            echo "Last active: $(date -u '+%Y-%m-%d %H:%M:%S UTC')" > .github/keepalive.txt
+            
+            git config --global user.name "github-actions[bot]"
+            git config --global user.email "github-actions[bot]@users.noreply.github.com"
+            git add .github/keepalive.txt
+            
+            # 只有當內容有變動時才 commit 與 push
+            if ! git diff --cached --quiet; then
+              git commit -m "chore: keepalive ping [skip ci]"
+              git push
+              echo "Committed keepalive timestamp successfully."
+            else
+              echo "No change in keepalive timestamp needed."
+            fi
+          else
+            echo "Skipping commit step (only runs at the start of each month)."
           fi
